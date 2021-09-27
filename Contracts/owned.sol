@@ -14,11 +14,17 @@ contract owned {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == _owner);
+        require(
+            msg.sender == _owner,
+            "Only an owner account could make this call."
+        );
         _;
     }
     modifier onlyAdmin() {
-        require(admins[msg.sender] == true);
+        require(
+            admins[msg.sender] == true,
+            "Only an Admin account could make this call."
+        );
         _;
     }
 

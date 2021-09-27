@@ -1,9 +1,10 @@
 const cuyToken = artifacts.require("cuyToken");
 
-module.exports = function (deployer, network, accounts) {
+module.exports = async function (deployer, network, accounts) {
   let name = "CuyToken";
   let symbol = "CTK";
   let initialAccount = accounts[0];
   let initialBalance = 0;
-  deployer.deploy(cuyToken, name, symbol, initialAccount, initialBalance);
+
+  await deployer.deploy(cuyToken, name, symbol, initialAccount, initialBalance);
 };

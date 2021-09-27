@@ -18,7 +18,10 @@ contract Pausable is owned {
     }
 
     modifier whenNotPaused() {
-        require(!paused);
+        require(
+            !paused,
+            "Contract is paused and cannot execute any operation."
+        );
         _;
     }
     modifier whenPaused() {
