@@ -3,6 +3,11 @@ require("chai").use(require("chai-as-promised")).should();
 
 let CuyToken = artifacts.require("./cuyToken.sol");
 
+const LOAN_PAID_ERROR = "CLIENTE_HAS_NO_LOAN_TO_PAY";
+const LOAN_NOT_PAID_ERROR = "CLIENT_HAS_AN_UNPAID_LOAN";
+const LOAN_PAID_CODE = 0;
+const LOAN_NOT_PAID_CODE = 1;
+
 contract("Pausable", (accounts) => {
   let accountOwner, Alice, Bob, Carlos, Damian, Evert;
   accountOwner = accounts[0];
@@ -48,18 +53,25 @@ contract("cuyToken", (accounts) => {
   Carlos = accounts[3];
   Damian = accounts[4];
   Evert = accounts[5];
+  Fucci = accounts[6];
+  seventhAccount = accounts[7];
+  eighthAccount = accounts[8];
+  ninethAccount = accounts[9];
+  tenthAccount = accounts[10];
+  eleventhAccount = accounts[11];
+
+  let name = "CuyToken";
+  let symbol = "CTK";
+  let initialBalance = 0;
+  let decimals = 18;
   let zero_address = "0x0000000000000000000000000000000000000000";
+  let cuyToken;
 
   beforeEach(async () => {
     cuyToken = await CuyToken.deployed();
   });
 
-  xdescribe("Desplegando el contrato: ", async () => {
-    let name = "CuyToken";
-    let symbol = "CTK";
-    let initialBalance = 0;
-    let decimals = 18;
-
+  xdescribe("DESPLEGANDO el contrato: ", async () => {
     it("Recupera nombre del Token ", async () => {
       let name_ = await cuyToken.tokenSummary();
       expect(name_.name).to.be.eq(name);
@@ -145,6 +157,22 @@ contract("cuyToken", (accounts) => {
     });
 
     it("Función 'lend': cuenta del prestatario no debe ser 0x00...0", async () => {
+      try {
+        await cuyToken.lend(
+          zero_address,
+          idClient,
+          idBusiness,
+          amountCuy,
+          amountFiat,
+          interest,
+          { from: accountOwner }
+        );
+      } catch (error) {
+        expect(error.message).to.include("error");
+      }
+    });
+
+    it("Función 'lend': cuenta del prestatario   debe ser 0x00...0. Muestra mensaje apropiado.", async () => {
       account = zero_address;
       await truffleAssert.reverts(
         cuyToken.lend(
@@ -158,6 +186,169 @@ contract("cuyToken", (accounts) => {
         ),
         "Address account borrower must not be 0."
       );
+    });
+
+    // Tokens minados se dirigen a un 'onlyAdmin'
+    it("Function 'lend': Suministro Total se incrementa correctamente ", async () => {
+      cuyToken = await CuyToken.deployed();
+      account = Damian;
+      amountCuy = 123123;
+      amountFiat = 10000;
+      interest = 100;
+      let bsupply = await cuyToken.totalSupply();
+      let totalSupply = Number(bsupply) + amountCuy;
+
+      let lendTx = await cuyToken.lend(
+        account,
+        idClient,
+        idBusiness,
+        amountCuy,
+        amountFiat,
+        interest,
+        { from: accountOwner }
+      );
+
+      let supply = await cuyToken.totalSupply();
+      expect(supply.toString()).to.be.eq(String(totalSupply));
+    });
+
+    it("Función 'lend': Eventos 'Transfer' (de f()mint) y 'Lend' (de ()lend) son disparados correctamente", async () => {
+      account = seventhAccount;
+      amountCuy = 123123;
+      amountFiat = 10000;
+      interest = 100;
+
+      let lendTx = await cuyToken.lend(
+        account,
+        idClient,
+        idBusiness,
+        amountCuy,
+        amountFiat,
+        interest,
+        { from: accountOwner }
+      );
+
+      // Event 'Transfer'
+      let evTransferName = "Transfer";
+      let evTransfer = [...lendTx.logs].filter(
+        (ev) => ev.event == evTransferName
+      );
+
+      assert.equal(
+        evTransfer[0].event,
+        evTransferName,
+        "Name event does not match."
+      );
+      assert.equal(
+        evTransfer[0].args._from,
+        zero_address,
+        "Is not sent from a address(0)."
+      );
+      assert.equal(
+        evTransfer[0].args._to,
+        accountOwner,
+        "Transfer - Account target ('onlyAdmin') does not match."
+      );
+      assert.equal(
+        evTransfer[0].args._value.toString(),
+        amountCuy,
+        "Amout of tokens sent does not match"
+      );
+
+      // Event 'Lend'
+      let evLendName = "Lend";
+      let evLend = [...lendTx.logs].filter((ev) => ev.event == evLendName);
+      assert.equal(evLend[0].event, evLendName, "Event name does not match.");
+      assert.equal(
+        evLend[0].args.from,
+        account,
+        "Account target does not match."
+      );
+      assert.equal(
+        evLend[0].args.value.toString(),
+        amountCuy,
+        "Amount of tokens sent does not match."
+      );
+    });
+
+    it("Function 'lend': un prestatario no puede pedir otro préstamo hasta que cancele el que tiene", async () => {
+      account = eighthAccount;
+      amountCuy = 123123;
+      amountFiat = 10000;
+      interest = 100;
+
+      await cuyToken.lend(
+        account,
+        idClient,
+        idBusiness,
+        amountCuy,
+        amountFiat,
+        interest,
+        { from: accountOwner }
+      );
+
+      let currentSupply = await cuyToken.totalSupply();
+
+      await truffleAssert.reverts(
+        cuyToken.lend(
+          account,
+          idClient,
+          idBusiness,
+          amountCuy,
+          amountFiat,
+          interest,
+          { from: accountOwner }
+        ),
+        LOAN_NOT_PAID_ERROR
+      );
+
+      let afterSupply = await cuyToken.totalSupply();
+
+      assert.equal(
+        currentSupply.toString(),
+        afterSupply.toString(),
+        "Supply should not increase if user is not allowed to get another loan"
+      );
+    });
+
+    it("Function 'lend': Verifica info del prestatario con 'loanBalance': ", async () => {
+      account = Fucci;
+      idClient = "FUCCI";
+      idBusiness = "FUCCIBIZ";
+      amountCuy = 321321;
+      amountFiat = 10000;
+      interest = 1000 + 100;
+
+      let lendTx = await cuyToken.lend(
+        account,
+        idClient,
+        idBusiness,
+        amountCuy,
+        amountFiat,
+        interest,
+        { from: accountOwner }
+      );
+
+      let balance = await cuyToken.loanBalance(account);
+      let {
+        scc,
+        idClient: idClient_,
+        idBusiness: idBusiness_,
+        amountCuy: amountCuy_,
+        amountFiat: amountFiat_,
+        interest: interest_,
+        interestFiat: interestFiat_,
+        balanceFiat: balanceFiat_,
+        balanceCuy,
+        open,
+      } = balance;
+      expect(scc).to.be.eq(accountOwner);
+      expect(idClient_).to.be.eq(idClient);
+      expect(idBusiness_).to.be.eq(idBusiness);
+      expect(amountCuy_).to.be.eq(String(amountCuy));
+      expect(amountFiat_).to.be.eq(String(amountFiat));
+      expect(interest_).to.be.eq(String(interest));
+      expect(balanceCuy).to.be.eq(String(amountCuy));
     });
   });
 });
