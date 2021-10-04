@@ -355,7 +355,7 @@ contract("cuyToken - Deploy, lend, mint and pay", (accounts) => {
   });
 });
 
-contract("cuyToken - TOKEN transference", (accounts) => {
+contract("cuyToken - Transferencia de TOKEN hacia compradores", (accounts) => {
   let accountOwner, Alice, Bob, Carlos, Damian, Evert;
   accountOwner = accounts[0];
   Alice = accounts[1];
@@ -394,7 +394,7 @@ contract("cuyToken - TOKEN transference", (accounts) => {
       await cuyToken.unpause({ from: accountOwner });
     });
 
-    it("Cuenta destino no debería ser address(0)", async () => {
+    it("Cuenta destino no debería ser address(0) - Muestra mensaje apropiado", async () => {
       await truffleAssert.reverts(
         cuyToken.transfer(zero_address, 20000, { from: accountOwner }),
         "Cuenta de destino no debería ser address(0)"
@@ -429,12 +429,11 @@ contract("cuyToken - TOKEN transference", (accounts) => {
       let amountTokensSystem = await cuyToken.balanceOf(accountOwner);
       let totalSupply = await cuyToken.totalSupply();
 
-      String(Number(amountTokensSystem.toString()) + tokensToTransfer),
-        assert.equal(
-          amountTokenPurchaser.toString(),
-          String(tokensToTransfer),
-          "Cantidad recibida de tokens no concuerda con la transferida"
-        );
+      assert.equal(
+        amountTokenPurchaser.toString(),
+        String(tokensToTransfer),
+        "Cantidad recibida de tokens no concuerda con la transferida"
+      );
 
       assert.equal(
         amountTokensSystem.toString(),
@@ -469,6 +468,231 @@ contract("cuyToken - TOKEN transference", (accounts) => {
         "Cantidad de tokens transferidas no fue el planteado"
       );
     });
-
   });
 });
+
+contract(
+  "cuyToken - Transferencia de TOKEN a compradores CONDICIONADO",
+  (accounts) => {
+    describe("Function 'transferConditioned': ", () => {
+      let accountOwner, Alice, Bob, Carlos, Damian, Evert;
+      accountOwner = accounts[0];
+      Alice = accounts[1];
+      Bob = accounts[2];
+      Carlos = accounts[3];
+      Damian = accounts[4];
+      Evert = accounts[5];
+      Fucci = accounts[6];
+      seventhAccount = accounts[7];
+      eighthAccount = accounts[8];
+      ninethAccount = accounts[9];
+      tenthAccount = accounts[10];
+      eleventhAccount = accounts[11];
+
+      let whitelist = [
+        eleventhAccount,
+        tenthAccount,
+        ninethAccount,
+        eighthAccount,
+      ];
+
+      before(async () => {
+        cuyToken = await CuyToken.deployed();
+        let idClient = "ALICE";
+        let idBusiness = "ALICEBIZ";
+        let amountCuy = 50000;
+        let amountFiat = 10000;
+        let interest = 1000;
+
+        await cuyToken.lend(
+          Alice,
+          idClient,
+          idBusiness,
+          amountCuy,
+          amountFiat,
+          interest,
+          { from: accountOwner }
+        );
+
+        await cuyToken.transfer(Bob, 20000, { from: accountOwner });
+      });
+
+      it("Destinatario no es una cuenta address(0)", async () => {
+        let to = zero_address;
+        let value = 10000;
+        try {
+          await cuyToken.transferConditioned(to, value, whitelist, {
+            from: accountOwner,
+          });
+        } catch (error) {
+          expect(error.message).to.include("error");
+        }
+      });
+
+      it("Destinatario no es una cuenta address(0) - Muestra mensaje apropiado", async () => {
+        let to = zero_address;
+        let value = 10000;
+
+        await truffleAssert.reverts(
+          cuyToken.transferConditioned(to, value, whitelist, {
+            from: accountOwner,
+          }),
+          "Only an owner account could make this call."
+        );
+      });
+
+      it("Balance del caller debe ser suficiente", async () => {
+        let to = Carlos;
+        let value = 100000;
+
+        try {
+          await cuyToken.transferConditioned(to, value, whitelist, {
+            from: accountOwner,
+          });
+        } catch (error) {
+          expect(error.message).to.include("error");
+        }
+      });
+
+      it("Balance del caller debe ser suficiente - Muestra mensaje apropiado", async () => {
+        let to = Carlos;
+        let value = 100000;
+
+        await truffleAssert.reverts(
+          cuyToken.transferConditioned(to, value, whitelist, {
+            from: accountOwner,
+          }),
+          "Not enough balance in caller to make this transaction."
+        );
+      });
+
+      it("Transferencia es exitosa: balance del destinatario y evento", async () => {
+        let to = Carlos;
+        let value = 10000;
+
+        let totalSupplyBefore = await cuyToken.totalSupply();
+        let amountTokensOwner = await cuyToken.balanceOf(accountOwner);
+
+        let txTransderConditioned = await cuyToken.transferConditioned(
+          to,
+          value,
+          whitelist,
+          {
+            from: accountOwner,
+          }
+        );
+
+        let totalSupply = await cuyToken.totalSupply();
+        let amtTknConditionedReceived = await cuyToken.balanceOf(Carlos);
+        let amtTknConditionedAfterSent = await cuyToken.balanceOf(accountOwner);
+
+        assert.equal(
+          totalSupplyBefore.toString(),
+          totalSupply.toString(),
+          "Suministro total no debería incrementarse."
+        );
+
+        assert.equal(
+          amtTknConditionedReceived.toString(),
+          String(value),
+          "Cantidad de tokens enviados no es la misma que los recibidos"
+        );
+
+        assert.equal(
+          String(
+            Number(amountTokensOwner.toString()) -
+              Number(amtTknConditionedAfterSent.toString())
+          ),
+          String(value),
+          "Se descuentan del caller la misma cantidad de tokens enviados"
+        );
+
+        let balanceConditionTknsInReceiver =
+          await cuyToken.balanceConditionedOf(Carlos);
+
+        assert.equal(
+          balanceConditionTknsInReceiver.toString(),
+          String(value),
+          "No se guardó la misma cantidad de tokens condicionados en la cuenta del destinatario"
+        );
+
+        for (let address of whitelist) {
+          let res = await cuyToken.isWhiteList(address, { from: Carlos });
+          assert.equal(
+            res.toString(),
+            String(value),
+            "Dentro del 'whitelist' no se guardo la misma cantidad de tokens que se condicionó"
+          );
+        }
+
+        assert.equal(
+          txTransderConditioned.logs[0].event,
+          "Transfer",
+          "Evento 'Transfer' no fue llamado correctamente."
+        );
+
+        assert.equal(
+          txTransderConditioned.logs[0].args._from,
+          accountOwner,
+          "Tokens no fueron transferidos desde un 'onlyAdmin'."
+        );
+        assert.equal(
+          txTransderConditioned.logs[0].args._to,
+          Carlos,
+          "El que recibió los tokens no es el destinatario correcto"
+        );
+        assert.equal(
+          txTransderConditioned.logs[0].args._value.toString(),
+          String(value),
+          "Cantidad de tokens transferidas no fue el planteado"
+        );
+      });
+    });
+
+    describe("Function 'shopPay': ", () => {
+      let accountOwner, Alice, Bob, Carlos, Damian, Evert;
+      accountOwner = accounts[0];
+      Alice = accounts[1];
+      Bob = accounts[2];
+      Carlos = accounts[3];
+      Damian = accounts[4];
+      Evert = accounts[5];
+      Fucci = accounts[6];
+      seventhAccount = accounts[7];
+      eighthAccount = accounts[8];
+      ninethAccount = accounts[9];
+      tenthAccount = accounts[10];
+      eleventhAccount = accounts[11];
+
+      let whitelist = [
+        eleventhAccount,
+        tenthAccount,
+        ninethAccount,
+        eighthAccount,
+      ];
+
+      it("Usuario pagará con tokens en tienda", async () => {
+        let payingToStore = eleventhAccount;
+        let tokensPaying = 10000;
+        await cuyToken.shopPay(payingToStore, tokensPaying, { from: Carlos });
+
+        let conditionalBalancePrev = await cuyToken.balanceConditionedOf(Carlos)
+        let balanceStore = await cuyToken.balanceOf(payingToStore);
+        assert.equal(
+          balanceStore.toString(),
+          String(tokensPaying),
+          "Tokens recibidos por la tienda no son los mismos que fueron pagados."
+        );
+
+        let conditionalBalance = await cuyToken.balanceConditionedOf(Carlos)
+
+        assert.equal(
+          conditionalBalance.toString(),
+          String(Number(conditionalBalancePrev) - 10000),
+          "Tokens condicionados retiradoss no fue el planeado."
+        );
+        
+      });
+    });
+  }
+);
