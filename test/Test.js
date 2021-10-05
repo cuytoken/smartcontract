@@ -671,12 +671,25 @@ contract(
         eighthAccount,
       ];
 
-      it("Usuario pagará con tokens en tienda", async () => {
+      it("Usuario pagará con tokens en tienda - verifica balance de comprador y tienda", async () => {
         let payingToStore = eleventhAccount;
         let tokensPaying = 10000;
+
+        let conditionalBalancePrev = await cuyToken.balanceConditionedOf(
+          Carlos
+        );
+
+        for (let white of whitelist) {
+          let balance_ = await cuyToken.isWhiteList(white, { from: Carlos });
+          assert.equal(
+            balance_.toString(),
+            String(tokensPaying),
+            "Cantidad de tokens permitidos para gastar en una tienda 'whitelist' no es la correcta."
+          );
+        }
+
         await cuyToken.shopPay(payingToStore, tokensPaying, { from: Carlos });
 
-        let conditionalBalancePrev = await cuyToken.balanceConditionedOf(Carlos)
         let balanceStore = await cuyToken.balanceOf(payingToStore);
         assert.equal(
           balanceStore.toString(),
@@ -684,14 +697,29 @@ contract(
           "Tokens recibidos por la tienda no son los mismos que fueron pagados."
         );
 
-        let conditionalBalance = await cuyToken.balanceConditionedOf(Carlos)
-
+        let conditionalBalance = await cuyToken.balanceConditionedOf(Carlos);
         assert.equal(
           conditionalBalance.toString(),
-          String(Number(conditionalBalancePrev) - 10000),
+          String(Number(conditionalBalancePrev.toString()) - 10000),
           "Tokens condicionados retiradoss no fue el planeado."
         );
-        
+
+        for (let white of whitelist) {
+          let balanceOfStoreAfterShop = await cuyToken.balanceOf(white);
+          if (white == payingToStore) {
+            assert.equal(
+              balanceOfStoreAfterShop.toString(),
+              String(tokensPaying),
+              "El balance de las tiendas luego de efectuarse el pago es correcto."
+            );
+            continue;
+          }
+          assert.equal(
+            balanceOfStoreAfterShop.toString(),
+            String(0),
+            "El balance de las tiendas luego de efectuarse el pago es correcto."
+          );
+        }
       });
     });
   }
