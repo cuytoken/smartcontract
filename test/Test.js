@@ -355,126 +355,129 @@ contract("cuyToken - Deploy, lend, mint and pay", (accounts) => {
   });
 });
 
-contract("cuyToken - Transferencia de TOKEN hacia compradores", (accounts) => {
-  let accountOwner, Alice, Bob, Carlos, Damian, Evert;
-  accountOwner = accounts[0];
-  Alice = accounts[1];
-  Bob = accounts[2];
-  Carlos = accounts[3];
-  Damian = accounts[4];
-  Evert = accounts[5];
-  Fucci = accounts[6];
-  seventhAccount = accounts[7];
-  eighthAccount = accounts[8];
-  ninethAccount = accounts[9];
-  tenthAccount = accounts[10];
-  eleventhAccount = accounts[11];
+contract(
+  "cuyToken - Transferencia de TOKEN hacia compradores echo por el sistema",
+  (accounts) => {
+    let accountOwner, Alice, Bob, Carlos, Damian, Evert;
+    accountOwner = accounts[0];
+    Alice = accounts[1];
+    Bob = accounts[2];
+    Carlos = accounts[3];
+    Damian = accounts[4];
+    Evert = accounts[5];
+    Fucci = accounts[6];
+    seventhAccount = accounts[7];
+    eighthAccount = accounts[8];
+    ninethAccount = accounts[9];
+    tenthAccount = accounts[10];
+    eleventhAccount = accounts[11];
 
-  beforeEach(async () => {
-    cuyToken = await CuyToken.deployed();
-  });
-
-  describe("Function 'transfer' - tranfiere a poseedores de tokens", () => {
-    let account = Alice;
-    let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
-    let idBusiness = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
-    let amountCuy = 30000;
-    let amountFiat = 10000;
-    let interest = 100;
-
-    it("No debería ser ejecutado cuando 'cuyToken' está PAUSADO", async () => {
-      await cuyToken.pause({ from: accountOwner });
-
-      // Bob es el comprador de tokens
-      await truffleAssert.reverts(
-        cuyToken.transfer(Bob, 20000, { from: accountOwner }),
-        "Contract is paused and cannot execute any operation."
-      );
-
-      await cuyToken.unpause({ from: accountOwner });
+    beforeEach(async () => {
+      cuyToken = await CuyToken.deployed();
     });
 
-    it("Cuenta destino no debería ser address(0) - Muestra mensaje apropiado", async () => {
-      await truffleAssert.reverts(
-        cuyToken.transfer(zero_address, 20000, { from: accountOwner }),
-        "Cuenta de destino no debería ser address(0)"
-      );
-    });
+    xdescribe("Function 'transfer' - tranfiere a poseedores de tokens", () => {
+      let account = Alice;
+      let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+      let idBusiness = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+      let amountCuy = 30000;
+      let amountFiat = 10000;
+      let interest = 100;
 
-    it("Cuando no hay suficientes fondos, muestra mensaje apropiado", async () => {
-      await truffleAssert.reverts(
-        cuyToken.transfer(Carlos, 50000, { from: accountOwner }),
-        "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
-      );
-    });
+      it("No debería ser ejecutado cuando 'cuyToken' está PAUSADO", async () => {
+        await cuyToken.pause({ from: accountOwner });
 
-    it("Tranfiere cantidad exacta de tokens a comprador", async () => {
-      await cuyToken.lend(
-        account, // prestatario - no recibe los tokens. los recibe accountOwner
-        idClient,
-        idBusiness,
-        amountCuy,
-        amountFiat,
-        interest,
-        { from: accountOwner }
-      );
-      let totalSupplyBefore = await cuyToken.totalSupply();
+        // Bob es el comprador de tokens
+        await truffleAssert.reverts(
+          cuyToken.transfer(Bob, 20000, { from: accountOwner }),
+          "Contract is paused and cannot execute any operation."
+        );
 
-      let tokensToTransfer = 20000;
-      let txTransfer = await cuyToken.transfer(Carlos, tokensToTransfer, {
-        from: accountOwner,
+        await cuyToken.unpause({ from: accountOwner });
       });
 
-      let amountTokenPurchaser = await cuyToken.balanceOf(Carlos);
-      let amountTokensSystem = await cuyToken.balanceOf(accountOwner);
-      let totalSupply = await cuyToken.totalSupply();
+      it("Cuenta destino no debería ser address(0) - Muestra mensaje apropiado", async () => {
+        await truffleAssert.reverts(
+          cuyToken.transfer(zero_address, 20000, { from: accountOwner }),
+          "Cuenta de destino no debería ser address(0)"
+        );
+      });
 
-      assert.equal(
-        amountTokenPurchaser.toString(),
-        String(tokensToTransfer),
-        "Cantidad recibida de tokens no concuerda con la transferida"
-      );
+      it("Cuando no hay suficientes fondos, muestra mensaje apropiado", async () => {
+        await truffleAssert.reverts(
+          cuyToken.transfer(Carlos, 50000, { from: accountOwner }),
+          "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
+        );
+      });
 
-      assert.equal(
-        amountTokensSystem.toString(),
-        String(Number(totalSupply.toString()) - tokensToTransfer),
-        "El admin no terminó con la catidad correcta de tokens luego de la transferencia"
-      );
+      it("Tranfiere cantidad exacta de tokens a comprador", async () => {
+        await cuyToken.lend(
+          account, // prestatario - no recibe los tokens. los recibe accountOwner
+          idClient,
+          idBusiness,
+          amountCuy,
+          amountFiat,
+          interest,
+          { from: accountOwner }
+        );
+        let totalSupplyBefore = await cuyToken.totalSupply();
 
-      assert.equal(
-        totalSupplyBefore.toString(),
-        totalSupply.toString(),
-        "El Suministro Total de tokens no debe variar luego de una transferencia."
-      );
+        let tokensToTransfer = 20000;
+        let txTransfer = await cuyToken.transfer(Carlos, tokensToTransfer, {
+          from: accountOwner,
+        });
 
-      assert.equal(
-        txTransfer.logs[0].event,
-        "Transfer",
-        "Evento 'Transfer' no fue llamado correctamente."
-      );
-      assert.equal(
-        txTransfer.logs[0].args._from,
-        accountOwner,
-        "Tokens no fueron transferidos desde un 'onlyAdmin'."
-      );
-      assert.equal(
-        txTransfer.logs[0].args._to,
-        Carlos,
-        "El que recibió los tokens no es el destinatario correcto"
-      );
-      assert.equal(
-        txTransfer.logs[0].args._value.toString(),
-        String(tokensToTransfer),
-        "Cantidad de tokens transferidas no fue el planteado"
-      );
+        let amountTokenPurchaser = await cuyToken.balanceOf(Carlos);
+        let amountTokensSystem = await cuyToken.balanceOf(accountOwner);
+        let totalSupply = await cuyToken.totalSupply();
+
+        assert.equal(
+          amountTokenPurchaser.toString(),
+          String(tokensToTransfer),
+          "Cantidad recibida de tokens no concuerda con la transferida"
+        );
+
+        assert.equal(
+          amountTokensSystem.toString(),
+          String(Number(totalSupply.toString()) - tokensToTransfer),
+          "El admin no terminó con la catidad correcta de tokens luego de la transferencia"
+        );
+
+        assert.equal(
+          totalSupplyBefore.toString(),
+          totalSupply.toString(),
+          "El Suministro Total de tokens no debe variar luego de una transferencia."
+        );
+
+        assert.equal(
+          txTransfer.logs[0].event,
+          "Transfer",
+          "Evento 'Transfer' no fue llamado correctamente."
+        );
+        assert.equal(
+          txTransfer.logs[0].args._from,
+          accountOwner,
+          "Tokens no fueron transferidos desde un 'onlyAdmin'."
+        );
+        assert.equal(
+          txTransfer.logs[0].args._to,
+          Carlos,
+          "El que recibió los tokens no es el destinatario correcto"
+        );
+        assert.equal(
+          txTransfer.logs[0].args._value.toString(),
+          String(tokensToTransfer),
+          "Cantidad de tokens transferidas no fue el planteado"
+        );
+      });
     });
-  });
-});
+  }
+);
 
 contract(
   "cuyToken - Transferencia de TOKEN a compradores CONDICIONADO",
   (accounts) => {
-    describe("Function 'transferConditioned': ", () => {
+    xdescribe("Function 'transferConditioned': ", () => {
       let accountOwner, Alice, Bob, Carlos, Damian, Evert;
       accountOwner = accounts[0];
       Alice = accounts[1];
@@ -649,7 +652,7 @@ contract(
       });
     });
 
-    describe("Function 'shopPay': ", () => {
+    xdescribe("Function 'shopPay': ", () => {
       let accountOwner, Alice, Bob, Carlos, Damian, Evert;
       accountOwner = accounts[0];
       Alice = accounts[1];
@@ -722,5 +725,171 @@ contract(
         }
       });
     });
+
+    xdescribe("Function 'balancesTransform': ", () => {
+      let accountOwner = accounts[0];
+      let Ana = accounts[1];
+      let Barb = accounts[2];
+      eighthAccount = accounts[8];
+      ninethAccount = accounts[9];
+      tenthAccount = accounts[10];
+      eleventhAccount = accounts[11];
+
+      let whitelist = [
+        eleventhAccount,
+        tenthAccount,
+        ninethAccount,
+        eighthAccount,
+      ];
+
+      before(async () => {
+        let name = "CuyToken";
+        let symbol = "CTK";
+        let initialAccount = accounts[0];
+        let initialBalance = 0;
+        cuyToken = await CuyToken.new(
+          name,
+          symbol,
+          initialAccount,
+          initialBalance
+        );
+
+        let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+        let idBusiness = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+        let amountCuy = 50000;
+        let amountFiat = 10000;
+        let interest = 100;
+
+        await cuyToken.lend(
+          Barb,
+          idClient,
+          idBusiness,
+          amountCuy,
+          amountFiat,
+          interest,
+          { from: accountOwner }
+        );
+      });
+
+      it("No recibe address(0)", async () => {
+        let tokensConditioned = 10000;
+
+        try {
+          await cuyToken.transferConditioned(
+            zero_address,
+            tokensConditioned,
+            whitelist,
+            {
+              from: accountOwner,
+            }
+          );
+        } catch (error) {
+          expect(error.message).to.include("error");
+        }
+      });
+
+      it("No recibe address(0) -  muestra mensaje apropiado", async () => {
+        let tokensConditioned = 10000;
+
+        await truffleAssert.reverts(
+          cuyToken.transferConditioned(
+            zero_address,
+            tokensConditioned,
+            whitelist,
+            {
+              from: accountOwner,
+            }
+          ),
+          "Could not be called for an address(0)."
+        );
+
+        let conditionedBalance = await cuyToken.balanceConditionedOf(Ana);
+
+        assert.equal(
+          conditionedBalance.toString(),
+          String(tokensConditioned),
+          "Tokens condicionados enviados no son correctos."
+        );
+      });
+
+      it("Verifica  balance pre y post 'balancesTransform'", async () => {
+        let tokens = 20000;
+        await cuyToken.transfer(Ana, tokens, { from: accountOwner });
+
+        let tokensConditioned = 10000;
+        await cuyToken.transferConditioned(Ana, tokensConditioned, whitelist, {
+          from: accountOwner,
+        });
+
+        let conditionedBalance = await cuyToken.balanceConditionedOf(Ana);
+
+        assert.equal(
+          conditionedBalance.toString(),
+          String(tokensConditioned),
+          "Cantidad de tokens condicionados enviados no es correcta."
+        );
+
+        let balance = await cuyToken.balanceOf(Ana);
+        assert.equal(
+          balance.toString(),
+          String(tokens + tokensConditioned),
+          "Cantidad de tokens enviados no es correcta."
+        );
+
+        let balanceTotalAnaPrev = await cuyToken.balanceOf(Ana);
+        let conditionedBalancePrev = await cuyToken.balanceConditionedOf(Ana);
+
+        await cuyToken.balancesTransform(Ana, tokensConditioned, {
+          from: accountOwner,
+        });
+
+        let balanceTotalAna = await cuyToken.balanceOf(Ana);
+        assert.equal(
+          balanceTotalAnaPrev.toString(),
+          balanceTotalAna.toString(),
+          "Balance total de TOKENS no debería cambiar."
+        );
+
+        let conditionedBalance_ = await cuyToken.balanceConditionedOf(Ana);
+        assert.equal(
+          conditionedBalance_.toString(),
+          String(Number(conditionedBalancePrev.toString()) - tokensConditioned),
+          "Balance condicionado de tokens no cambió correctamente."
+        );
+      });
+    });
   }
 );
+
+contract("cuyToken - Transferencia de TOKEN hacia compradores", (accounts) => {
+  let accountOwner, Alice, Bob, Carlos, Damian, Evert;
+  accountOwner = accounts[0];
+  Alice = accounts[1];
+  Bob = accounts[2];
+  Carlos = accounts[3];
+  Damian = accounts[4];
+  Evert = accounts[5];
+  Fucci = accounts[6];
+  seventhAccount = accounts[7];
+  eighthAccount = accounts[8];
+  ninethAccount = accounts[9];
+  tenthAccount = accounts[10];
+  eleventhAccount = accounts[11];
+
+  before(async () => {
+    before(async () => {
+      let name = "CuyToken";
+      let symbol = "CTK";
+      let initialAccount = accounts[0];
+      let initialBalance = 0;
+      cuyToken = await CuyToken.new(
+        name,
+        symbol,
+        initialAccount,
+        initialBalance
+      );
+    });
+  });
+
+  describe("Function 'transfer' - tranfiere a poseedores de tokens", () => {});
+});
