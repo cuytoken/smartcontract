@@ -864,17 +864,9 @@ contract(
 contract("cuyToken - Transferencia de TOKEN hacia compradores", (accounts) => {
   let accountOwner, Alice, Bob, Carlos, Damian, Evert;
   accountOwner = accounts[0];
-  Alice = accounts[1];
-  Bob = accounts[2];
-  Carlos = accounts[3];
-  Damian = accounts[4];
-  Evert = accounts[5];
-  Fucci = accounts[6];
-  seventhAccount = accounts[7];
-  eighthAccount = accounts[8];
-  ninethAccount = accounts[9];
-  tenthAccount = accounts[10];
-  eleventhAccount = accounts[11];
+  Anastasia = accounts[1];
+  Benito = accounts[2];
+  Cesar = accounts[3];
 
   before(async () => {
     before(async () => {
@@ -888,8 +880,90 @@ contract("cuyToken - Transferencia de TOKEN hacia compradores", (accounts) => {
         initialAccount,
         initialBalance
       );
+
+      let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+      let idBusiness = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
+      let amountCuy = 50000;
+      let amountFiat = 10000;
+      let interest = 100;
+
+      await cuyToken.lend(
+        Anastasia,
+        idClient,
+        idBusiness,
+        amountCuy,
+        amountFiat,
+        interest,
+        { from: accountOwner }
+      );
+
+      await cuyToken.transfer(Benito, 20000, { from: accountOwner });
+      await cuyToken.transfer(Cesar, 20000, { from: accountOwner });
     });
   });
 
-  describe("Function 'transfer' - tranfiere a poseedores de tokens", () => {});
+  describe("Function 'approve' -", () => {
+    it("'spender' no debe ser un cuenta address(0) - muestra mensaje apropiado", async () => {
+      let approveTokens = 12000;
+
+      try {
+        await cuyToken.approve(zero_address, approveTokens);
+      } catch (error) {
+        expect(error.message).to.include("error");
+      }
+      await truffleAssert.reverts(
+        cuyToken.approve(zero_address, approveTokens),
+        "'spender' address cannot be address(0)."
+      );
+    });
+
+    it("Caller approves for a 'spender' - verifica allowance y event 'Approval'", async () => {
+      let caller = Benito;
+      let spender = Cesar;
+      let allowedAmount = 12000;
+
+      let txApawait = await cuyToken.approve(spender, allowedAmount, {
+        from: caller,
+      });
+
+      let eventTriggered = "Approval";
+      expect(txApawait.logs[0].event).to.be.eq(eventTriggered);
+      expect(txApawait.logs[0].args._owner).to.be.eq(caller);
+      expect(txApawait.logs[0].args._spender).to.be.eq(spender);
+      expect(txApawait.logs[0].args._value.toString()).to.be.eq(
+        String(allowedAmount)
+      );
+
+      let allowance = await cuyToken.allowance(caller, spender);
+      assert.equal(
+        allowance.toString(),
+        String(allowedAmount),
+        "Monto de tokens en allowance no son los mismos dado por el dueño"
+      );
+    });
+
+    it("'tranferFrom' - 'spender' no puede ser un address(0) - muestra mensaje apropiado", async () => {
+      let caller = Benito;
+      let spender = Cesar;
+      let allowedAmount = 12000;
+
+      try {
+        await cuyToken.transferFrom(caller, zero_address, allowedAmount, {
+          from: spender,
+        });
+      } catch (error) {
+        expect(error.message).to.include("error");
+      }
+
+      await truffleAssert.reverts(
+        cuyToken.transferFrom(caller, zero_address, allowedAmount, {
+          from: accountOwner,
+        }),
+        "'spender' address cannot be 0."
+      );
+    });
+
+    
+
+  });
 });
