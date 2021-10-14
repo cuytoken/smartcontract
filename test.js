@@ -107,9 +107,3 @@
  * 2. 'transferFrom' es llamado por aquel que se le ha permitido transferir token en nombre de otro actor. Llama esta función para dismiuir el balance de tokens del que lo permitió. Los tokens se suman al que se está enviando. El que llama el contrato tiene que ser al que se le permitió mover los tokens.
  * 
  */
-
-/**
- * Fees?
- * incluir las funciones increaseAllowance y decreaseAllowance
-
- */

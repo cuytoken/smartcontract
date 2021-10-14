@@ -71,7 +71,7 @@ contract("cuyToken - Deploy, lend, mint and pay", (accounts) => {
     cuyToken = await CuyToken.deployed();
   });
 
-  xdescribe("DESPLEGANDO el contrato: ", async () => {
+  describe("DESPLEGANDO el contrato: ", async () => {
     it("Recupera nombre del Token ", async () => {
       let name_ = await cuyToken.tokenSummary();
       expect(name_.name).to.be.eq(name);
@@ -104,7 +104,7 @@ contract("cuyToken - Deploy, lend, mint and pay", (accounts) => {
     });
   });
 
-  xdescribe("MINADO, PRÉSTAMO y PAGO DE PRÉSTAMO ", () => {
+  describe("MINADO, PRÉSTAMO y PAGO DE PRÉSTAMO ", () => {
     // Datos del que recibirá el préstamo (loan)
     let account = Alice;
     let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
@@ -376,7 +376,7 @@ contract(
       cuyToken = await CuyToken.deployed();
     });
 
-    xdescribe("Function 'transfer' - tranfiere a poseedores de tokens", () => {
+    describe("Function 'transfer' - tranfiere a poseedores de tokens", () => {
       let account = Alice;
       let idClient = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
       let idBusiness = String(Math.floor(Math.random() * 10000)); // número de 5 dígitos
@@ -477,7 +477,7 @@ contract(
 contract(
   "cuyToken - Transferencia de TOKEN a compradores CONDICIONADO",
   (accounts) => {
-    xdescribe("Function 'transferConditioned': ", () => {
+    describe("Function 'transferConditioned': ", () => {
       let accountOwner, Alice, Bob, Carlos, Damian, Evert;
       accountOwner = accounts[0];
       Alice = accounts[1];
@@ -652,7 +652,7 @@ contract(
       });
     });
 
-    xdescribe("Function 'shopPay': ", () => {
+    describe("Function 'shopPay': ", () => {
       let accountOwner, Alice, Bob, Carlos, Damian, Evert;
       accountOwner = accounts[0];
       Alice = accounts[1];
@@ -726,7 +726,7 @@ contract(
       });
     });
 
-    xdescribe("Function 'balancesTransform': ", () => {
+    describe("Function 'balancesTransform': ", () => {
       let accountOwner = accounts[0];
       let Ana = accounts[1];
       let Barb = accounts[2];
@@ -1039,13 +1039,13 @@ contract(
           "Amout of TOKENS deducted from 'from' is not correct."
         );
 
-        let eventName = "Tranfer";
+        let eventName = "Transfer";
 
         expect(txTransferFrom.logs[0].event).to.be.eq(eventName);
         expect(txTransferFrom.logs[0].args._from).to.be.eq(from);
         expect(txTransferFrom.logs[0].args._to).to.be.eq(to);
         expect(txTransferFrom.logs[0].args._value.toString()).to.be.eq(
-          allowedAmount
+          String(allowedAmount)
         );
       });
     });
