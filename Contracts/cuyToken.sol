@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.6;
+pragma solidity 0.8.6;
 
 /**
  *@notice The cuytoken implements the ERC20 token
- *@author Lenin Tarrillo
+ *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com - Twitter: @lenomtv)
+ *@author Lee Marreros(lee.marreros@pucp.pe)
  */
 
 /**
@@ -17,6 +17,7 @@ contract Owned {
     string public constant NO_ADMIN_ERROR =
         "THE_ACCOUNT_IS_NOT_ADMIN_OF_THE_CONTRACT";
     string public constant WRONG_ADDRESS = "WRONG_ADDRESS";
+    string public constant ALREADY_ADMIN = "ADDRESS_IS_ALREADY_ADMIN";
 
     event OwnershipTransferred(
         address indexed previousOwner,
@@ -60,6 +61,7 @@ contract Owned {
         address oldOwner = _owner;
         _owner = newOwner;
         admins[newOwner] = true;
+        admins[oldOwner] = false;
         emit OwnershipTransferred(oldOwner, newOwner);
     }
 
@@ -67,8 +69,12 @@ contract Owned {
         return admins[account];
     }
 
-    function addAdmin(address account) public onlyOwner {
-        require(account != address(0) && !admins[account]);
+    function addAdmin(address account)
+        public
+        validDestination(account)
+        onlyOwner
+    {
+        require(!admins[account], ALREADY_ADMIN);
         admins[account] = true;
     }
 
@@ -95,9 +101,9 @@ contract CriptoCredit is Owned {
         string idClient;
         string idBusiness;
         uint256 amountCuy;
-        uint256 amountFiat;
-        uint256 balanceFiat;
-        uint256 paidFiat;
+        uint32 amountFiat;
+        uint32 balanceFiat;
+        uint32 paidFiat;
         uint256 paidCuy;
         bool open;
     }
@@ -109,12 +115,12 @@ contract CriptoCredit is Owned {
     ) {
         require(
             debtors[account].open == status,
-            LoanMessageHandler(verificationCode)
+            loanMessageHandler(verificationCode)
         );
         _;
     }
 
-    function LoanMessageHandler(uint8 restrictionCode)
+    function loanMessageHandler(uint8 restrictionCode)
         private
         pure
         returns (string memory message)
@@ -135,8 +141,8 @@ contract CriptoCredit is Owned {
         string memory idClient,
         string memory idBusiness,
         uint256 amountCuy,
-        uint256 amountFiat,
-        uint256 balanceFiat
+        uint32 amountFiat,
+        uint32 balanceFiat
     )
         internal
         onlyAdmin
@@ -172,7 +178,7 @@ contract CriptoCredit is Owned {
      */
     function loanPay(
         address account,
-        uint256 paidFiat,
+        uint32 paidFiat,
         uint256 paidCuy
     )
         internal
@@ -195,7 +201,8 @@ contract CriptoCredit is Owned {
 /**
  *Pausable
  *@notice this contract is used to pause cuytoken
- *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com)
+ *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com - Twitter: @lenomtv)
+ *@author Lee Marreros(lee.marreros@pucp.pe)
  */
 contract Pausable is Owned {
     event PausedEvt(address account);
@@ -238,7 +245,8 @@ contract Pausable is Owned {
 /**
  *ConditionedSpending
  *@notice The purpose of this contract is to allow people to condition the final spending of the transferred cuytokens.
- *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com)
+ *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com - Twitter: @lenomtv)
+ *@author Lee Marreros(lee.marreros@pucp.pe)
  */
 contract ConditionedSpending is Owned, Pausable {
     mapping(address => uint256) private conditionedBalances; //conditioned Balances
@@ -247,9 +255,7 @@ contract ConditionedSpending is Owned, Pausable {
     string public constant CS_FUNDS_ERROR =
         "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS_TO_PAY";
     string public constant ILLEGAL_PAYMENT =
-        "ILLEGAL_PAYMENT_STORE_NOT_ALLOWED";
-    string public constant CS_INSUFFICIENT_FUNDS =
-        "ILLEGAL_PAYMENT_STORE_NOT_ALLOWED";
+        "NOT_ALLOWED_AMOUNT_FOR_THIS_STORE";
     string public constant CS_ERROR_ACCOUNT = "ILLEGAL_ACCOUNT";
 
     event ConditionalTokenPayment(
@@ -272,7 +278,7 @@ contract ConditionedSpending is Owned, Pausable {
     /**
      * this function checks if the account is on the spending whitelist
      */
-    function isSpendingWhiteList(address account)
+    function getSpendingWhiteList(address account)
         public
         view
         returns (uint256)
@@ -281,7 +287,7 @@ contract ConditionedSpending is Owned, Pausable {
     }
 
     /**
-     * check if the account has permissions to spend in the store
+     * Returns the amount of whitelist balance for a 'shop' from a 'payer'
      */
     function checkSpendingWhiteList(address payer, address shop)
         public
@@ -322,7 +328,7 @@ contract ConditionedSpending is Owned, Pausable {
     ) internal whenNotPaused validDestination(to) returns (bool success) {
         conditionedBalances[to] = conditionedBalances[to] + value;
 
-        for (uint256 i; i < whitelist.length; i++) {
+        for (uint8 i = 0; i < whitelist.length; i++) {
             wlCBalances[to][whitelist[i]] =
                 wlCBalances[to][whitelist[i]] +
                 value;
@@ -344,7 +350,7 @@ interface IERC20 {
 
     function totalSupply() external view returns (uint256);
 
-    function balanceOf(address _owner) external view returns (uint256 balance);
+    function balanceOf(address owner) external view returns (uint256 balance);
 
     function transfer(address _to, uint256 _value)
         external
@@ -360,7 +366,7 @@ interface IERC20 {
         external
         returns (bool success);
 
-    function allowance(address _owner, address _spender)
+    function allowance(address owner, address _spender)
         external
         view
         returns (uint256 remaining);
@@ -384,7 +390,8 @@ interface IERC20 {
 /**
  *CuyToken ERC20
  *@notice The cuytoken implements the ERC20 token
- *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com)
+ *@author Lenin Tarrillo (lenin.tarrillo.v@gmail.com - Twitter: @lenomtv)
+ *@author Lee Marreros(lee.marreros@pucp.pe)
  */
 contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     TokenSummary public tokenSummary;
@@ -502,13 +509,13 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         return true;
     }
 
-    function allowance(address _owner, address spender)
+    function allowance(address owner, address spender)
         public
         view
         override
         returns (uint256)
     {
-        return allowed[_owner][spender];
+        return allowed[owner][spender];
     }
 
     function increaseAllowance(address spender, uint256 addedValue)
@@ -519,7 +526,8 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         returns (bool success)
     {
         require(
-            balances[msg.sender] >= allowed[msg.sender][spender] + addedValue,
+            balances[msg.sender] - balanceConditionedOf(msg.sender) >=
+                allowed[msg.sender][spender] + addedValue,
             INSUFFICIENT_FUNDS
         );
         allowed[msg.sender][spender] += addedValue;
@@ -531,9 +539,9 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         public
         override
         whenNotPaused
+        validDestination(spender)
         returns (bool success)
     {
-        require(spender != address(0), WRONG_ADDRESS);
         require(
             allowed[msg.sender][spender] >= subtractedValue,
             FUNDS_SUBTRACT_MSJ
@@ -615,8 +623,8 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         string memory idClient,
         string memory idBusiness,
         uint256 amountCuy,
-        uint256 amountFiat,
-        uint256 balanceFiat
+        uint32 amountFiat,
+        uint32 balanceFiat
     ) public whenNotPaused onlyAdmin validDestination(account) returns (bool) {
         if (mint(msg.sender, amountCuy)) //mined
         {
@@ -659,7 +667,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
      */
     function creditPay(
         address account,
-        uint256 amountFiat,
+        uint32 amountFiat,
         uint256 amountCuy
     ) public onlyAdmin validDestination(account) returns (bool) {
         require(amountCuy > 0, ZERO_CUYS_PAY);
