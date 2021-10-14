@@ -16,6 +16,12 @@ contract Owned {
         "THE_ACCOUNT_IS_NOT_OWNER_OF_THE_CONTRACT";
     string public constant NO_ADMIN_ERROR =
         "THE_ACCOUNT_IS_NOT_ADMIN_OF_THE_CONTRACT";
+    string public constant WRONG_ADDRESS = "WRONG_ADDRESS";
+
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     mapping(address => bool) admins;
 
@@ -29,7 +35,13 @@ contract Owned {
         _;
     }
     modifier onlyAdmin() {
-        require(admins[msg.sender] == true, NO_ADMIN_ERROR);
+        require(admins[msg.sender], NO_ADMIN_ERROR);
+        _;
+    }
+
+    modifier validDestination(address to) {
+        require(to != address(0), WRONG_ADDRESS);
+        require(to != address(this), WRONG_ADDRESS);
         _;
     }
 
@@ -37,8 +49,18 @@ contract Owned {
         return _owner;
     }
 
+    function renounceOwnership() public onlyOwner {
+        address oldOwner = _owner;
+        _owner = address(0);
+        emit OwnershipTransferred(oldOwner, address(0));
+    }
+
     function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != _owner && newOwner != address(0), WRONG_ADDRESS);
+        address oldOwner = _owner;
         _owner = newOwner;
+        admins[newOwner] = true;
+        emit OwnershipTransferred(oldOwner, newOwner);
     }
 
     function isAdmin(address account) public view onlyOwner returns (bool) {
@@ -51,7 +73,7 @@ contract Owned {
     }
 
     function removeAdmin(address account) public onlyOwner {
-        require(account != address(0) && admins[account]);
+        require(account != _owner && account != address(0) && admins[account]);
         admins[account] = false;
     }
 }
@@ -65,7 +87,6 @@ contract CriptoCredit is Owned {
 
     string public constant LOAN_PAID_ERROR = "CLIENTE_HAS_NO_LOAN_TO_PAY";
     string public constant LOAN_NOT_PAID_ERROR = "CLIENT_HAS_AN_UNPAID_LOAN";
-    string public constant WRONG_ADDRESS = "WRONG_ADDRESS";
     uint8 public constant LOAN_PAID_CODE = 0;
     uint8 public constant LOAN_NOT_PAID_CODE = 1;
 
@@ -81,18 +102,6 @@ contract CriptoCredit is Owned {
         bool open;
     }
 
-    function LoanMessageHandler(uint8 restrictionCode)
-        private
-        pure
-        returns (string memory message)
-    {
-        if (restrictionCode == LOAN_PAID_CODE) {
-            message = LOAN_PAID_ERROR;
-        } else if (restrictionCode == LOAN_NOT_PAID_CODE) {
-            message = LOAN_NOT_PAID_ERROR;
-        }
-    }
-
     modifier loanStatus(
         address account,
         bool status,
@@ -105,9 +114,21 @@ contract CriptoCredit is Owned {
         _;
     }
 
+    function LoanMessageHandler(uint8 restrictionCode)
+        private
+        pure
+        returns (string memory message)
+    {
+        if (restrictionCode == LOAN_PAID_CODE) {
+            message = LOAN_PAID_ERROR;
+        } else if (restrictionCode == LOAN_NOT_PAID_CODE) {
+            message = LOAN_NOT_PAID_ERROR;
+        }
+    }
+
     /**
-     * This method records the loan details
-     * only the crypto credit system (admin) can execute this method
+     * This method records the loan details.
+     * Only the crypto credit system (admin) can execute this method
      */
     function loanAdd(
         address account,
@@ -116,9 +137,12 @@ contract CriptoCredit is Owned {
         uint256 amountCuy,
         uint256 amountFiat,
         uint256 balanceFiat
-    ) internal onlyAdmin loanStatus(account, false, LOAN_NOT_PAID_CODE) {
-        require(account != address(0), WRONG_ADDRESS);
-
+    )
+        internal
+        onlyAdmin
+        loanStatus(account, false, LOAN_NOT_PAID_CODE)
+        validDestination(account)
+    {
         debtors[account] = LoanInfo(
             msg.sender,
             idClient,
@@ -144,7 +168,7 @@ contract CriptoCredit is Owned {
     }
 
     /**
-     * This method records the payment of a loan fee, previously verifying that the loan is still pending payment
+     * This method records the payment of a loan fee, previously verifying that the loan is still pending of payment
      */
     function loanPay(
         address account,
@@ -154,9 +178,9 @@ contract CriptoCredit is Owned {
         internal
         onlyAdmin
         loanStatus(account, true, LOAN_PAID_CODE)
+        validDestination(account)
         returns (bool)
     {
-        require(account != address(0), WRONG_ADDRESS);
         debtors[account].paidFiat = debtors[account].paidFiat + paidFiat;
         debtors[account].paidCuy = debtors[account].paidCuy + paidCuy;
         if (debtors[account].paidFiat >= debtors[account].balanceFiat) {
@@ -176,8 +200,8 @@ contract CriptoCredit is Owned {
 contract Pausable is Owned {
     event PausedEvt(address account);
     event UnpausedEvt(address account);
-    string public constant PAUSE_ON_SMJ = "THE_CONTRACT_IS_PAUSE";
-    string public constant PAUSE_NO_SMJ = "THE_CONTRACT_NO_PAUSE";
+    string public constant PAUSE_ON_SMJ = "THE_CONTRACT_IS_PAUSED";
+    string public constant PAUSE_NO_SMJ = "THE_CONTRACT_IS_NOT_PAUSED";
     bool private paused;
 
     constructor() {
@@ -228,9 +252,11 @@ contract ConditionedSpending is Owned, Pausable {
         "ILLEGAL_PAYMENT_STORE_NOT_ALLOWED";
     string public constant CS_ERROR_ACCOUNT = "ILLEGAL_ACCOUNT";
 
-    event cPay(address indexed _from, address indexed _to, uint256 _value);
-
-    event BalancesTransform(address sender, address from, uint256 value);
+    event ConditionalTokenPayment(
+        address indexed _from,
+        address indexed _to,
+        uint256 _value
+    );
 
     /**
      * get the conditioned balance of the account
@@ -268,9 +294,9 @@ contract ConditionedSpending is Owned, Pausable {
 
     /**
      * This method makes a transfer in the form of payment to an authorized store,
-     * the cuytokens that will be spent will only be those that are marked as conditional balances
+     * the cuytokens that will be spent are only those that are marked as conditional balances
      */
-    function Pay(address to, uint256 value)
+    function pay(address to, uint256 value)
         internal
         whenNotPaused
         returns (bool success)
@@ -281,7 +307,7 @@ contract ConditionedSpending is Owned, Pausable {
             conditionedBalances[msg.sender] -
             value;
         wlCBalances[msg.sender][to] = wlCBalances[msg.sender][to] - value;
-        emit cPay(msg.sender, to, value);
+        emit ConditionalTokenPayment(msg.sender, to, value);
         return true;
     }
 
@@ -289,11 +315,11 @@ contract ConditionedSpending is Owned, Pausable {
      * This method transfers cuytokens and establishes spending restrictions
      * cuytokens with restrictions can only be used to pay in stores
      */
-    function transConditioned(
+    function conditionedTransfer(
         address to,
         uint256 value,
         address[] memory whitelist
-    ) internal whenNotPaused returns (bool success) {
+    ) internal whenNotPaused validDestination(to) returns (bool success) {
         conditionedBalances[to] = conditionedBalances[to] + value;
 
         for (uint256 i; i < whitelist.length; i++) {
@@ -444,9 +470,9 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         public
         override
         whenNotPaused
+        validDestination(to)
         returns (bool success)
     {
-        require(to != address(0), WRONG_ADDRESS);
         require(
             (balances[msg.sender] - balanceConditionedOf(msg.sender)) >= value,
             INSUFFICIENT_FUNDS
@@ -461,7 +487,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         address from,
         address spender,
         uint256 value
-    ) public override whenNotPaused returns (bool) {
+    ) public override whenNotPaused validDestination(spender) returns (bool) {
         require(spender != address(0), WRONG_ADDRESS);
         require(
             value <= (balances[from] - balanceConditionedOf(from)),
@@ -489,9 +515,13 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         public
         override
         whenNotPaused
+        validDestination(spender)
         returns (bool success)
     {
-        require(spender != address(0), WRONG_ADDRESS);
+        require(
+            balances[msg.sender] >= allowed[msg.sender][spender] + addedValue,
+            INSUFFICIENT_FUNDS
+        );
         allowed[msg.sender][spender] += addedValue;
         emit Approval(msg.sender, spender, allowed[msg.sender][spender]);
         return true;
@@ -516,9 +546,13 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     function approve(address spender, uint256 value)
         public
         override
+        validDestination(spender)
         returns (bool)
     {
-        require(spender != address(0), WRONG_ADDRESS);
+        require(
+            balances[msg.sender] - balanceConditionedOf(msg.sender) >= value,
+            INSUFFICIENT_FUNDS
+        );
         allowed[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
         return true;
@@ -539,12 +573,13 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     function payShop(address to, uint256 value)
         public
         whenNotPaused
+        validDestination(to)
         returns (bool success)
     {
-        require(to != address(0), WRONG_ADDRESS);
-
-        if (Pay(to, value)) {
+        require(balances[msg.sender] >= value, INSUFFICIENT_FUNDS);
+        if (pay(to, value)) {
             balances[to] = balances[to] + value;
+            balances[msg.sender] -= value;
             emit Transfer(msg.sender, to, value);
             return true;
         }
@@ -560,12 +595,11 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         address to,
         uint256 value,
         address[] memory whitelist
-    ) public whenNotPaused returns (bool success) {
-        require(to != address(0), WRONG_ADDRESS);
-        require(balances[msg.sender] > value, INSUFFICIENT_FUNDS);
+    ) public whenNotPaused validDestination(to) returns (bool success) {
+        require(balances[msg.sender] >= value, INSUFFICIENT_FUNDS);
         balances[msg.sender] = balances[msg.sender] - value;
         balances[to] = balances[to] + value;
-        transConditioned(to, value, whitelist);
+        conditionedTransfer(to, value, whitelist);
         emit Transfer(msg.sender, to, value);
         return true;
     }
@@ -583,9 +617,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         uint256 amountCuy,
         uint256 amountFiat,
         uint256 balanceFiat
-    ) public whenNotPaused onlyAdmin returns (bool) {
-        require(account != address(0), WRONG_ADDRESS);
-
+    ) public whenNotPaused onlyAdmin validDestination(account) returns (bool) {
         if (mint(msg.sender, amountCuy)) //mined
         {
             loanAdd(
@@ -611,9 +643,9 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         internal
         whenNotPaused
         onlyAdmin
+        validDestination(account)
         returns (bool)
     {
-        require(account != address(0), WRONG_ADDRESS);
         require(_totalSupply + value <= MAXIMUMSUPPLY, MAXIMUMSUPPLY_MSJ);
 
         _totalSupply += value;
@@ -629,8 +661,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         address account,
         uint256 amountFiat,
         uint256 amountCuy
-    ) public onlyAdmin returns (bool) {
-        require(account != address(0), WRONG_ADDRESS);
+    ) public onlyAdmin validDestination(account) returns (bool) {
         require(amountCuy > 0, ZERO_CUYS_PAY);
         require(amountFiat > 0, ZERO_FIAT_PAY);
 
