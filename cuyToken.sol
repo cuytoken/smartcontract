@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.6;
+pragma solidity 0.8.0;
 
 /**
  *@notice The cuytoken implements the ERC20 token
@@ -12,12 +12,6 @@ pragma solidity 0.8.6;
  */
 contract Owned {
     address private _owner;
-    string public constant NO_OWNER_ERROR =
-        "THE_ACCOUNT_IS_NOT_OWNER_OF_THE_CONTRACT";
-    string public constant NO_ADMIN_ERROR =
-        "THE_ACCOUNT_IS_NOT_ADMIN_OF_THE_CONTRACT";
-    string public constant WRONG_ADDRESS = "WRONG_ADDRESS";
-    string public constant ALREADY_ADMIN = "ADDRESS_IS_ALREADY_ADMIN";
 
     event OwnershipTransferred(
         address indexed previousOwner,
@@ -32,17 +26,17 @@ contract Owned {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == _owner, NO_OWNER_ERROR);
+        require(msg.sender == _owner, "THE_ACCOUNT_IS_NOT_OWNER_OF_THE_CONTRACT");
         _;
     }
     modifier onlyAdmin() {
-        require(admins[msg.sender], NO_ADMIN_ERROR);
+        require(admins[msg.sender], "THE_ACCOUNT_IS_NOT_ADMIN_OF_THE_CONTRACT");
         _;
     }
 
     modifier validDestination(address to) {
-        require(to != address(0), WRONG_ADDRESS);
-        require(to != address(this), WRONG_ADDRESS);
+        require(to != address(0), "WRONG_ADDRESS");
+        require(to != address(this), "WRONG_ADDRESS");
         _;
     }
 
@@ -57,7 +51,7 @@ contract Owned {
     }
 
     function transferOwnership(address newOwner) public onlyOwner {
-        require(newOwner != _owner && newOwner != address(0), WRONG_ADDRESS);
+        require(newOwner != _owner && newOwner != address(0), "WRONG_ADDRESS");
         address oldOwner = _owner;
         _owner = newOwner;
         admins[newOwner] = true;
@@ -74,7 +68,7 @@ contract Owned {
         validDestination(account)
         onlyOwner
     {
-        require(!admins[account], ALREADY_ADMIN);
+        require(!admins[account], "ADDRESS_IS_ALREADY_ADMIN");
         admins[account] = true;
     }
 
@@ -90,9 +84,6 @@ contract Owned {
  */
 contract CriptoCredit is Owned {
     mapping(address => LoanInfo) debtors;
-
-    string public constant LOAN_PAID_ERROR = "CLIENTE_HAS_NO_LOAN_TO_PAY";
-    string public constant LOAN_NOT_PAID_ERROR = "CLIENT_HAS_AN_UNPAID_LOAN";
     uint8 public constant LOAN_PAID_CODE = 0;
     uint8 public constant LOAN_NOT_PAID_CODE = 1;
 
@@ -126,9 +117,9 @@ contract CriptoCredit is Owned {
         returns (string memory message)
     {
         if (restrictionCode == LOAN_PAID_CODE) {
-            message = LOAN_PAID_ERROR;
+            message = "CLIENTE_HAS_NO_LOAN_TO_PAY";
         } else if (restrictionCode == LOAN_NOT_PAID_CODE) {
-            message = LOAN_NOT_PAID_ERROR;
+            message = "CLIENT_HAS_AN_UNPAID_LOAN";
         }
     }
 
@@ -207,8 +198,6 @@ contract CriptoCredit is Owned {
 contract Pausable is Owned {
     event PausedEvt(address account);
     event UnpausedEvt(address account);
-    string public constant PAUSE_ON_SMJ = "THE_CONTRACT_IS_PAUSED";
-    string public constant PAUSE_NO_SMJ = "THE_CONTRACT_IS_NOT_PAUSED";
     bool private paused;
 
     constructor() {
@@ -216,11 +205,11 @@ contract Pausable is Owned {
     }
 
     modifier whenNotPaused() {
-        require(!paused, PAUSE_ON_SMJ);
+        require(!paused, "THE_CONTRACT_IS_PAUSED");
         _;
     }
     modifier whenPaused() {
-        require(paused, PAUSE_NO_SMJ);
+        require(paused, "THE_CONTRACT_IS_NOT_PAUSED");
         _;
     }
 
@@ -251,12 +240,6 @@ contract Pausable is Owned {
 contract ConditionedSpending is Owned, Pausable {
     mapping(address => uint256) private conditionedBalances; //conditioned Balances
     mapping(address => mapping(address => uint256)) private wlCBalances; //White list of conditioned Balances
-
-    string public constant CS_FUNDS_ERROR =
-        "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS_TO_PAY";
-    string public constant ILLEGAL_PAYMENT =
-        "NOT_ALLOWED_AMOUNT_FOR_THIS_STORE";
-    string public constant CS_ERROR_ACCOUNT = "ILLEGAL_ACCOUNT";
 
     event ConditionalTokenPayment(
         address indexed _from,
@@ -307,8 +290,8 @@ contract ConditionedSpending is Owned, Pausable {
         whenNotPaused
         returns (bool success)
     {
-        require(conditionedBalances[msg.sender] >= value, CS_FUNDS_ERROR);
-        require(wlCBalances[msg.sender][to] >= value, ILLEGAL_PAYMENT);
+        require(conditionedBalances[msg.sender] >= value, "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS_TO_PAY");
+        require(wlCBalances[msg.sender][to] >= value, "NOT_ALLOWED_AMOUNT_FOR_THIS_STORE");
         conditionedBalances[msg.sender] =
             conditionedBalances[msg.sender] -
             value;
@@ -404,20 +387,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     uint256 public constant MAXIMUMSUPPLY = 200000000000000000000000000;
 
     uint8 public constant SUCCESS_CODE = 0;
-    string public constant SUCCESS_MESSAGE = "SUCCESS";
     uint8 public constant NON_WHITELIST_CODE = 1;
-    string public constant NON_WHITELIST_ERROR =
-        "ILLEGAL_TRANSFER_TO_NON_WHITELISTED_ADDRESS";
-    string public constant INSUFFICIENT_FUNDS =
-        "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS";
-
-    string public constant ZERO_CUYS_PAY = "ILLEGAL_ATTEMPT_TO_PAY_ZERO_CUYS";
-    string public constant ZERO_FIAT_PAY = "ILLEGAL_ATTEMPT_TO_PAY_ZERO_FIAT";
-    string public constant MAXIMUMSUPPLY_MSJ = "ILLEGAL_MINING_MAXIMUM_SUPPLY";
-    string public constant FUNDS_SUBTRACT_MSJ =
-        "INSUFFICIENT_FUNDS_TO_SUBTRACT";
-    string public constant ILEGAL_SPENDER_MSJ =
-        "ILLEGAL_TRANSFER_UNAUTHORIZED_SPENDER";
 
     event Burn(address from, uint256 value);
     event Lend(address from, uint256 value);
@@ -463,9 +433,9 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         returns (string memory message)
     {
         if (restrictionCode == SUCCESS_CODE) {
-            message = SUCCESS_MESSAGE;
+            message = "SUCCESS";
         } else if (restrictionCode == NON_WHITELIST_CODE) {
-            message = NON_WHITELIST_ERROR;
+            message = "ILLEGAL_TRANSFER_TO_NON_WHITELISTED_ADDRESS";
         }
     }
 
@@ -482,7 +452,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     {
         require(
             (balances[msg.sender] - balanceConditionedOf(msg.sender)) >= value,
-            INSUFFICIENT_FUNDS
+            "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
         );
         balances[msg.sender] = balances[msg.sender] - value;
         balances[to] = balances[to] + value;
@@ -495,12 +465,12 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         address spender,
         uint256 value
     ) public override whenNotPaused validDestination(spender) returns (bool) {
-        require(spender != address(0), WRONG_ADDRESS);
+        require(spender != address(0), "WRONG_ADDRESS");
         require(
             value <= (balances[from] - balanceConditionedOf(from)),
-            INSUFFICIENT_FUNDS
+            "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
         );
-        require(value <= allowed[from][msg.sender], ILEGAL_SPENDER_MSJ);
+        require(value <= allowed[from][msg.sender], "ILLEGAL_TRANSFER_UNAUTHORIZED_SPENDER");
 
         balances[from] = balances[from] - value;
         balances[spender] = balances[spender] + value;
@@ -528,7 +498,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         require(
             balances[msg.sender] - balanceConditionedOf(msg.sender) >=
                 allowed[msg.sender][spender] + addedValue,
-            INSUFFICIENT_FUNDS
+            "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
         );
         allowed[msg.sender][spender] += addedValue;
         emit Approval(msg.sender, spender, allowed[msg.sender][spender]);
@@ -544,7 +514,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     {
         require(
             allowed[msg.sender][spender] >= subtractedValue,
-            FUNDS_SUBTRACT_MSJ
+            "INSUFFICIENT_FUNDS_TO_SUBTRACT"
         );
         allowed[msg.sender][spender] -= subtractedValue;
         emit Approval(msg.sender, spender, allowed[msg.sender][spender]);
@@ -559,7 +529,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     {
         require(
             balances[msg.sender] - balanceConditionedOf(msg.sender) >= value,
-            INSUFFICIENT_FUNDS
+            "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS"
         );
         allowed[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
@@ -567,7 +537,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
     }
 
     function burn(uint256 value) public whenNotPaused returns (bool success) {
-        require(balances[msg.sender] >= value, INSUFFICIENT_FUNDS);
+        require(balances[msg.sender] >= value, "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS");
         balances[msg.sender] -= value;
         _totalSupply -= value;
         emit Burn(msg.sender, value);
@@ -584,7 +554,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         validDestination(to)
         returns (bool success)
     {
-        require(balances[msg.sender] >= value, INSUFFICIENT_FUNDS);
+        require(balances[msg.sender] >= value, "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS");
         if (pay(to, value)) {
             balances[to] = balances[to] + value;
             balances[msg.sender] -= value;
@@ -604,7 +574,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         uint256 value,
         address[] memory whitelist
     ) public whenNotPaused validDestination(to) returns (bool success) {
-        require(balances[msg.sender] >= value, INSUFFICIENT_FUNDS);
+        require(balances[msg.sender] >= value, "ILLEGAL_TRANSFER_INSUFFICIENT_FUNDS");
         balances[msg.sender] = balances[msg.sender] - value;
         balances[to] = balances[to] + value;
         conditionedTransfer(to, value, whitelist);
@@ -654,7 +624,7 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         validDestination(account)
         returns (bool)
     {
-        require(_totalSupply + value <= MAXIMUMSUPPLY, MAXIMUMSUPPLY_MSJ);
+        require(_totalSupply + value <= MAXIMUMSUPPLY, "ILLEGAL_MINING_MAXIMUM_SUPPLY");
 
         _totalSupply += value;
         balances[account] = balances[account] + value;
@@ -670,8 +640,8 @@ contract CuyToken is IERC20, Pausable, CriptoCredit, ConditionedSpending {
         uint32 amountFiat,
         uint256 amountCuy
     ) public onlyAdmin validDestination(account) returns (bool) {
-        require(amountCuy > 0, ZERO_CUYS_PAY);
-        require(amountFiat > 0, ZERO_FIAT_PAY);
+        require(amountCuy > 0, "ILLEGAL_ATTEMPT_TO_PAY_ZERO_CUYS");
+        require(amountFiat > 0, "ILLEGAL_ATTEMPT_TO_PAY_ZERO_FIAT");
 
         if (loanPay(account, amountFiat, amountCuy)) //Record the payment
         {
